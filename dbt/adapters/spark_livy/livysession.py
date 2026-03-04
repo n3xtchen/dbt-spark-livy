@@ -15,19 +15,17 @@
 """Spark Livy session integration."""
 
 from __future__ import annotations
-from cmath import log
 
 import json
 import time 
 import requests
-from urllib import response
 
 import datetime as dt
 from types import TracebackType
 from typing import Any
 
 import dbt.exceptions
-from dbt.events import AdapterLogger
+from dbt.adapters.events.logging import AdapterLogger
 from dbt.utils import DECIMALS
 
 from requests_kerberos import HTTPKerberosAuth
@@ -215,7 +213,7 @@ class LivyCursor:
         https://github.com/mkleehammer/pyodbc/wiki/Cursor#close
         """
         self._rows = None
-        
+
     def _submitLivyCode(self, code):
         # Submit code
         data = {'code': code}

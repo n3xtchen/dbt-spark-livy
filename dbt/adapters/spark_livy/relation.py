@@ -1,9 +1,10 @@
 from typing import Optional
+from dataclasses import dataclass, field
 
 from dataclasses import dataclass
 
 from dbt.adapters.base.relation import BaseRelation, Policy
-from dbt.exceptions import RuntimeException
+from dbt_common.exceptions import DbtRuntimeError as RuntimeException
 import dbt.adapters.spark_livy.cloudera_tracking as tracker
 
 
@@ -23,8 +24,8 @@ class SparkIncludePolicy(Policy):
 
 @dataclass(frozen=True, eq=False, repr=False)
 class SparkRelation(BaseRelation):
-    quote_policy: SparkQuotePolicy = SparkQuotePolicy()
-    include_policy: SparkIncludePolicy = SparkIncludePolicy()
+    quote_policy: Policy = field(default_factory=lambda: SparkQuotePolicy())
+    include_policy: Policy = field(default_factory=lambda: SparkIncludePolicy())
     quote_character: str = "`"
     is_delta: Optional[bool] = None
     is_hudi: Optional[bool] = None

@@ -1,19 +1,18 @@
 import re
-import json
 from concurrent.futures import Future
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Union, Type
 from typing_extensions import TypeAlias
 
 import agate
-from dbt.contracts.relation import RelationType
+from dbt.adapters.contracts.relation import RelationType
 
 import dbt
 import dbt.exceptions
 
 from dbt.adapters.base import AdapterConfig, PythonJobHelper
 from dbt.adapters.base.impl import catch_as_completed
-from dbt.contracts.connection import AdapterResponse
+from dbt.adapters.contracts.connection import AdapterResponse
 from dbt.adapters.sql import SQLAdapter
 from dbt.adapters.spark_livy import SparkConnectionManager
 from dbt.adapters.spark_livy import SparkRelation
@@ -24,9 +23,9 @@ from dbt.adapters.spark_livy.python_submissions import (
     AllPurposeClusterPythonJobHelper,
 )
 from dbt.adapters.base import BaseRelation
-from dbt.clients.agate_helper import DEFAULT_TYPE_TESTER
-from dbt.events import AdapterLogger
-from dbt.utils import executor
+from dbt_common.clients.agate_helper import DEFAULT_TYPE_TESTER
+from dbt.adapters.events.logging import AdapterLogger
+from dbt_common.utils import AttrDict, executor
 
 logger = AdapterLogger("Spark")
 
@@ -166,8 +165,8 @@ class SparkAdapter(SQLAdapter):
 
         return relations
 
-    def get_relation(self, database: str, schema: str, identifier: str) -> Optional[BaseRelation]:
-        if not self.Relation.include_policy.database:
+    def get_relation(self, database: Optional[str], schema: str, identifier: str) -> Optional[BaseRelation]:
+        if not self.Relation.get_default_include_policy().database:
             database = None  # type: ignore
 
         return super().get_relation(database, schema, identifier)

@@ -1,19 +1,20 @@
+import os
+
 from contextlib import contextmanager
 
-import os
 import json
 import time
 
-import dbt.exceptions
+import dbt_common.exceptions
 import dbt.adapters.spark_livy.__version__ as ver
 import dbt.adapters.spark_livy.cloudera_tracking as tracker
 
-from dbt.adapters.base import Credentials
+from dbt.adapters.contracts.connection import Credentials
 from dbt.adapters.sql import SQLConnectionManager
-from dbt.contracts.connection import AdapterRequiredConfig, ConnectionState, AdapterResponse, Connection
-from dbt.events.types import ConnectionUsed, SQLQuery, SQLQueryStatus
-from dbt.events import AdapterLogger
-from dbt.events.functions import fire_event
+from dbt.adapters.contracts.connection import AdapterRequiredConfig, ConnectionState, AdapterResponse, Connection
+from dbt.adapters.events.types import ConnectionUsed, SQLQuery, SQLQueryStatus
+from dbt.adapters.events.logging import AdapterLogger
+from dbt_common.events.functions import fire_event
 from dbt.utils import DECIMALS
 from dbt.adapters.spark_livy import __version__
 from dbt.adapters.spark_livy.livysession import LivyConnection, LivySessionConnectionWrapper, LivyConnectionManager
@@ -34,7 +35,7 @@ except ImportError:
 from datetime import datetime
 import sqlparams
 
-from hologram.helpers import StrEnum
+from dbt_common.dataclass_schema import StrEnum
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 
@@ -113,7 +114,7 @@ class SparkCredentials(Credentials):
 
         # spark classifies database and schema as the same thing
         if self.database is not None and self.database != self.schema:
-            raise dbt.exceptions.RuntimeException(
+            raise dbt_common.exceptions.DbtRunnimeError(
                 f"    schema: {self.schema} \n"
                 f"    database: {self.database} \n"
                 f"On Spark, database must be omitted or have the same value as"
@@ -125,7 +126,7 @@ class SparkCredentials(Credentials):
             try:
                 import pyodbc  # noqa: F401
             except ImportError as e:
-                raise dbt.exceptions.RuntimeException(
+                raise dbt_common.exceptions.DbtRuntimeError(
                     f"{self.method} connection method requires "
                     "additional dependencies. \n"
                     "Install the additional required dependencies with "
@@ -134,7 +135,7 @@ class SparkCredentials(Credentials):
                 ) from e
 
         if self.method == SparkConnectionMethod.ODBC and self.cluster and self.endpoint:
-            raise dbt.exceptions.RuntimeException(
+            raise dbt_common.exceptions.DbtRuntimeError(
                 "`cluster` and `endpoint` cannot both be set when"
                 f" using {self.method} method to connect to Spark"
             )
@@ -143,7 +144,7 @@ class SparkCredentials(Credentials):
             self.method == SparkConnectionMethod.HTTP
             or self.method == SparkConnectionMethod.THRIFT
         ) and not (ThriftState and THttpClient and hive):
-            raise dbt.exceptions.RuntimeException(
+            raise dbt_common.exceptions.DbtRuntimeError(
                 f"{self.method} connection method requires "
                 "additional dependencies. \n"
                 "Install the additional required dependencies with "
@@ -154,7 +155,7 @@ class SparkCredentials(Credentials):
             try:
                 import pyspark  # noqa: F401
             except ImportError as e:
-                raise dbt.exceptions.RuntimeException(
+                raise dbt_common.exceptions.DbtRuntimeError(
                     f"{self.method} connection method requires "
                     "additional dependencies. \n"
                     "Install the additional required dependencies with "
@@ -309,8 +310,8 @@ class SparkConnectionManager(SQLConnectionManager):
 
     spark_version = None
 
-    def __init__(self, profile: AdapterRequiredConfig):
-        super().__init__(profile)
+    def __init__(self, profile: AdapterRequiredConfig, mp_context):
+        super().__init__(profile, mp_context)
         # generate profile related object for instrumentation.
         tracker.generate_profile_info(self)
 
@@ -328,9 +329,9 @@ class SparkConnectionManager(SQLConnectionManager):
             thrift_resp = exc.args[0]
             if hasattr(thrift_resp, "status"):
                 msg = thrift_resp.status.errorMessage
-                raise dbt.exceptions.RuntimeException(msg)
+                raise dbt_common.exceptions.DbtRuntimeError(msg)
             else:
-                raise dbt.exceptions.RuntimeException(str(exc))
+                raise dbt_common.exceptions.DbtRuntimeError(str(exc))
 
     def cancel(self, connection):
         connection.handle.cancel()
@@ -543,7 +544,7 @@ class SparkConnectionManager(SQLConnectionManager):
                     msg = "Failed to connect"
                     if creds.token is not None:
                         msg += ", is your token valid?"
-                    raise dbt.exceptions.FailedToConnectException(msg) from e
+                    raise dbt.adapters.exceptions.FailedToConnectError(msg) from e
                 retryable_message = _is_retryable_error(e)
                 if retryable_message and creds.connect_retries > 0:
                     msg = (
@@ -564,7 +565,7 @@ class SparkConnectionManager(SQLConnectionManager):
                     logger.warning(msg)
                     time.sleep(creds.connect_timeout)
                 else:
-                    raise dbt.exceptions.FailedToConnectException("failed to connect") from e
+                    raise dbt.adapters.exceptions.FailedToConnectError("failed to connect") from e
         else:
             raise exc
 
