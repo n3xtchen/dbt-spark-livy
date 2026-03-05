@@ -24,7 +24,7 @@ import datetime as dt
 from types import TracebackType
 from typing import Any
 
-import dbt.exceptions
+import dbt_common.exceptions
 from dbt.adapters.events.logging import AdapterLogger
 from dbt.utils import DECIMALS
 
@@ -97,7 +97,7 @@ class LivySession:
                 break
             if res['state'] == 'dead':
                 print("ERROR, cannot create a livy interactive session")
-                raise dbt.exceptions.FailedToConnectException(
+                raise dbt_common.exceptions.FailedToConnectException(
                         'failed to connect'
                     )
                 return
@@ -254,8 +254,6 @@ class LivyCursor:
                   verify=self.verify_ssl_certificate
             ).json()
 
-            # print(res)
-
             if res['state'] == 'available':
                 return res
             time.sleep(DEFAULT_POLL_WAIT)
@@ -302,7 +300,8 @@ class LivyCursor:
             self._rows = None
             self._schema = None
 
-            raise dbt.exceptions.raise_database_error(
+            logger.debug(f"Error executing SQL: {sql}, error: {res['output']['evalue']}")
+            raise dbt_common.exceptions.DbtDatabaseError(
                         'Error while executing query: ' + res['output']['evalue']
                     ) 
 

@@ -8,7 +8,7 @@ import agate
 from dbt.adapters.contracts.relation import RelationType
 
 import dbt
-import dbt.exceptions
+import dbt_common.exceptions
 
 from dbt.adapters.base import AdapterConfig, PythonJobHelper
 from dbt.adapters.base.impl import catch_as_completed
@@ -133,7 +133,7 @@ class SparkAdapter(SQLAdapter):
         kwargs = {"schema_relation": schema_relation}
         try:
             results = self.execute_macro(LIST_RELATIONS_MACRO_NAME, kwargs=kwargs)
-        except dbt.exceptions.RuntimeException as e:
+        except dbt.exceptions.DbtRuntimeError as e:
             errmsg = getattr(e, "msg", "")
             if f"Database '{schema_relation}' not found" in errmsg:
                 return []
@@ -145,7 +145,7 @@ class SparkAdapter(SQLAdapter):
         relations = []
         for row in results:
             if len(row) != 4:
-                raise dbt.exceptions.RuntimeException(
+                raise dbt.exceptions.DbtRuntimeError(
                     f'Invalid value from "show table extended ...", '
                     f"got {len(row)} values, expected 4"
                 )

@@ -51,7 +51,7 @@ except ImportError:
 import base64
 import time
 
-logger = AdapterLogger("Spark")
+logger = AdapterLogger("Spark Livy")
 
 NUMBERS = DECIMALS + (int, float)
 
@@ -260,12 +260,12 @@ class PyhiveConnectionWrapper(object):
         if poll_state.errorMessage:
             logger.debug("Poll response: {}".format(poll_state))
             logger.debug("Poll status: {}".format(state))
-            dbt.exceptions.raise_database_error(poll_state.errorMessage)
+            raise dbt_common.exceptions.DbtDatabaseError(poll_state.errorMessage)
 
         elif state not in STATE_SUCCESS:
             status_type = ThriftState._VALUES_TO_NAMES.get(state, "Unknown<{!r}>".format(state))
 
-            dbt.exceptions.raise_database_error("Query failed with status: {}".format(status_type))
+            raise dbt_common.exceptions.DbtDatabaseError("Query failed with status: {}".format(status_type))
 
         logger.debug("Poll status: {}, query complete".format(state))
 
@@ -361,7 +361,7 @@ class SparkConnectionManager(SQLConnectionManager):
 
         for key in required:
             if not hasattr(creds, key):
-                raise dbt.exceptions.DbtProfileError(
+                raise dbt_common.exceptions.DbtProfileError(
                     "The config '{}' is required when using the {} method"
                     " to connect to Spark".format(key, method)
                 )
@@ -442,7 +442,7 @@ class SparkConnectionManager(SQLConnectionManager):
                             endpoint=creds.endpoint
                         )
                     else:
-                        raise dbt.exceptions.DbtProfileError(
+                        raise dbt_common.exceptions.DbtProfileError(
                             "Either `cluster` or `endpoint` must set when"
                             " using the odbc method to connect to Spark"
                         )
@@ -532,7 +532,7 @@ class SparkConnectionManager(SQLConnectionManager):
                     if connection_ex:
                         raise connection_ex
                 else:
-                    raise dbt.exceptions.DbtProfileError(
+                    raise dbt_common.exceptions.DbtProfileError(
                         f"invalid credential method: {creds.method}"
                     )
                 break
