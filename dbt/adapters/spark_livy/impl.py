@@ -1,7 +1,7 @@
 import re
 from concurrent.futures import Future
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Union, Type
+from typing import Any, Dict, Iterable, List, Optional, Union, Type, FrozenSet, Tuple
 from typing_extensions import TypeAlias
 
 import agate
@@ -10,6 +10,7 @@ from dbt.adapters.contracts.relation import RelationType
 import dbt
 import dbt_common.exceptions
 
+from dbt_common.exceptions import CompilationError
 from dbt.adapters.base import AdapterConfig, PythonJobHelper
 from dbt.adapters.base.impl import catch_as_completed
 from dbt.adapters.contracts.connection import AdapterResponse
@@ -23,6 +24,7 @@ from dbt.adapters.spark_livy.python_submissions import (
     AllPurposeClusterPythonJobHelper,
 )
 from dbt.adapters.base import BaseRelation
+from dbt.adapters.contracts.relation import RelationType, RelationConfig
 from dbt_common.clients.agate_helper import DEFAULT_TYPE_TESTER
 from dbt.adapters.events.logging import AdapterLogger
 from dbt_common.utils import AttrDict, executor
@@ -119,7 +121,7 @@ class SparkAdapter(SQLAdapter):
         """Cache a new schema in dbt. It will show up in `list relations`."""
         if schema is None:
             name = self.nice_connection_name()
-            dbt.exceptions.raise_compiler_error(
+            raise CompilationError(
                 "Attempted to cache a null schema for {}".format(name)
             )
         if dbt.flags.USE_CACHE:  # type: ignore
@@ -271,12 +273,12 @@ class SparkAdapter(SQLAdapter):
         )
         return dict(properties)
 
-    def get_catalog(self, manifest):
-        schema_map = self._get_catalog_schemas(manifest)
-        if len(schema_map) > 1:
-            dbt.exceptions.raise_compiler_error(
-                f"Expected only one database in get_catalog, found " f"{list(schema_map)}"
-            )
+    def get_catalog(
+            self, 
+            relation_configs: Iterable[RelationConfig],
+            used_schemas: FrozenSet[Tuple[str, str]],
+    ) -> Tuple["agate.Table", List[Exception]]:
+        schema_map = self._get_catalog_schemas(relation_configs)
 
         with executor(self.config) as tpe:
             futures: List[Future[agate.Table]] = []
@@ -289,7 +291,7 @@ class SparkAdapter(SQLAdapter):
                             self._get_one_catalog,
                             info,
                             [schema],
-                            manifest,
+                            relation_configs,
                         )
                     )
             catalogs, exceptions = catch_as_completed(futures)
@@ -302,7 +304,7 @@ class SparkAdapter(SQLAdapter):
         manifest,
     ) -> agate.Table:
         if len(schemas) != 1:
-            dbt.exceptions.raise_compiler_error(
+            raise CompilationError(
                 f"Expected only one schema in spark _get_one_catalog, found " f"{schemas}"
             )
 
